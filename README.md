@@ -45,6 +45,7 @@ there.
 ```
 apps/web/           Traycer Pulse dashboard, Next.js 14
 packages/sdk/       @traycer/sdk, the published sensing library
+services/ingest/    Terminates the SDK upload contract, FastAPI
 services/voice/     openSMILE acoustic extraction, FastAPI
 services/scoring/   Personal baseline and deviation scoring, FastAPI
 services/pulse-api/ Alert classification and clinician notification, FastAPI
@@ -127,6 +128,12 @@ than one that does not.
   prodromal signature.
 - **Alert classification.** Confirmation windows, cooldown, per patient
   thresholds, muted signals and quiet hours are implemented and tested.
+- **Ingest.** Terminates the SDK upload contract. Device token verification,
+  deduplication on batch id, envelope decryption, server side validation
+  against the closed feature vocabulary, and writes to the hypertable. A cross
+  language contract test seals an envelope by running the real SDK through
+  Node and decrypts it in Python, so the wire format is verified rather than
+  assumed.
 - **Dashboard.** TrajectoryChart, RiskScoreBadge, AlertFeed, PatientRiskPanel,
   VoiceBiomarkerPanel and the SDK status views are built. The alert feed and
   alert acknowledgement read from the live pulse API. The panel, trajectory,
@@ -156,9 +163,6 @@ than one that does not.
   relapse outcomes. The behavioral features and their directions come from the
   digital phenotyping literature. The thresholds that would turn them into a
   clinical instrument do not exist yet.
-- **Ingest service.** The SDK uploads to a documented endpoint contract. The
-  service that terminates it is not in this repository. This is the one thing
-  standing between the repo and an end to end system.
 - **Four dashboard read endpoints.** The panel list, per patient trajectory,
   telemetry and voice endpoints are called by the dashboard and are not
   implemented server side. The frontend falls back to generated data and says

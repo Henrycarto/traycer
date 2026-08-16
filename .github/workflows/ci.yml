@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [voice, scoring, pulse-api]
+        service: [voice, scoring, pulse-api, ingest]
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +113,48 @@ jobs:
         working-directory: services/${{ matrix.service }}
         run: python -c "import app.main; print('app imports cleanly')"
 
+  sdk-contract:
+    name: SDK wire contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - run: npm ci
+
+      # The contract test seals an envelope by running the SDK's own built
+      # crypto through Node and decrypts it in the ingest service. It skips
+      # itself when the SDK is not built, so the build is the point of this
+      # job: without it the test would pass by doing nothing.
+      - name: Build the SDK
+        run: npm run build --workspace=@traycer/sdk
+
+      - name: Install the ingest service
+        run: pip install -r services/ingest/requirements.txt
+
+      - name: Verify the wire format across both languages
+        working-directory: services/ingest
+        run: python -m pytest tests/test_sdk_contract.py -q --no-header -rA
+
+      # A skip here means the guard silently stopped guarding, which is worse
+      # than a failure because it looks green.
+      - name: Fail if the contract test skipped
+        working-directory: services/ingest
+        run: |
+          if python -m pytest tests/test_sdk_contract.py -q 2>&1 | grep -q "skipped"; then
+            echo "the SDK contract test skipped, so the wire format was never checked"
+            exit 1
+          fi
+          echo "contract test ran"
+
   copy-rules:
     name: Copy rules
     runs-on: ubuntu-latest
@@ -127,7 +169,7 @@ jobs:
   docker:
     name: Container builds
     runs-on: ubuntu-latest
-    needs: [sdk, web, services]
+    needs: [sdk, web, services, sdk-contract]
     steps:
       - uses: actions/checkout@v4
 
@@ -159,6 +201,14 @@ jobs:
           push: false
           cache-from: type=gha,scope=pulse-api
           cache-to: type=gha,mode=max,scope=pulse-api
+
+      - name: Build the ingest image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/ingest
+          push: false
+          cache-from: type=gha,scope=ingest
+          cache-to: type=gha,mode=max,scope=ingest
 
       - name: Build the dashboard image
         uses: docker/build-push-action@v6

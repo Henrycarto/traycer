@@ -29,6 +29,14 @@ venv/
 .ruff_cache/
 *.egg-info/
 
+# Ingest private keys. The public half is safe to distribute with the SDK,
+# the private half decrypts every batch that has ever been uploaded.
+infra/secrets/*
+!infra/secrets/README.md
+*.pem
+*.key
+*.p8
+
 # Model artifacts. The relapse prediction model and its weights stay private.
 *.onnx
 *.pkl

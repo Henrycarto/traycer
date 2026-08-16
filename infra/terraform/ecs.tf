@@ -34,12 +34,13 @@ resource "aws_cloudwatch_log_group" "services" {
 }
 
 locals {
-  services = ["voice", "scoring", "pulse-api", "web"]
+  services = ["voice", "scoring", "pulse-api", "ingest", "web"]
 
   service_ports = {
     voice       = 8000
     scoring     = 8000
     "pulse-api" = 8000
+    ingest      = 8000
     web         = 3000
   }
 
@@ -51,13 +52,17 @@ locals {
     voice       = 1024
     scoring     = 1024
     "pulse-api" = 512
-    web         = 512
+    # RSA unwrap per batch is the cost here, and it scales with device count
+    # rather than with clinician activity.
+    ingest = 1024
+    web    = 512
   }
 
   service_memory = {
     voice       = 2048
     scoring     = 4096
     "pulse-api" = 1024
+    ingest      = 1024
     web         = 1024
   }
 
@@ -65,7 +70,10 @@ locals {
     voice       = var.environment == "production" ? 2 : 1
     scoring     = var.environment == "production" ? 2 : 1
     "pulse-api" = var.environment == "production" ? 2 : 1
-    web         = var.environment == "production" ? 2 : 1
+    # Ingest is the write path for every enrolled device. Two tasks minimum
+    # in every environment so a single task restart never drops uploads.
+    ingest = 2
+    web    = var.environment == "production" ? 2 : 1
   }
 }
 
@@ -140,6 +148,7 @@ resource "aws_iam_role_policy" "execution_secrets" {
           aws_secretsmanager_secret.timeseries.arn,
           aws_secretsmanager_secret.jwt_signing.arn,
           aws_secretsmanager_secret.fcm.arn,
+          aws_secretsmanager_secret.ingest_keys.arn,
         ]
       },
       {
@@ -212,11 +221,22 @@ resource "aws_ecs_task_definition" "services" {
         { name = "VOICE_API_INTERNAL_URL", value = "http://voice.traycer.local:8000" },
       ]
 
-      secrets = [
-        { name = "JWT_SIGNING_KEY", valueFrom = aws_secretsmanager_secret.jwt_signing.arn },
-        { name = "POSTGRES_DSN", valueFrom = "${aws_secretsmanager_secret.relational.arn}:dsn::" },
-        { name = "TIMESCALE_DSN", valueFrom = "${aws_secretsmanager_secret.timeseries.arn}:dsn::" },
-      ]
+      # Only the ingest task receives the decryption keys. Every other task
+      # runs without them, so a compromise elsewhere in the platform cannot
+      # read an uploaded batch.
+      secrets = concat(
+        [
+          { name = "JWT_SIGNING_KEY", valueFrom = aws_secretsmanager_secret.jwt_signing.arn },
+          { name = "POSTGRES_DSN", valueFrom = "${aws_secretsmanager_secret.relational.arn}:dsn::" },
+          { name = "TIMESCALE_DSN", valueFrom = "${aws_secretsmanager_secret.timeseries.arn}:dsn::" },
+        ],
+        each.key == "ingest" ? [
+          {
+            name     = "INGEST_PRIVATE_KEYS_INLINE"
+            valueFrom = aws_secretsmanager_secret.ingest_keys.arn
+          },
+        ] : [],
+      )
 
       logConfiguration = {
         logDriver = "awslogs"
@@ -301,7 +321,7 @@ resource "aws_ecs_service" "services" {
   # Only the dashboard and the pulse API are reachable from outside. Scoring
   # and voice are internal and are addressed through service discovery.
   dynamic "load_balancer" {
-    for_each = contains(["web", "pulse-api"], each.key) ? [1] : []
+    for_each = contains(["web", "pulse-api", "ingest"], each.key) ? [1] : []
     content {
       target_group_arn = aws_lb_target_group.public[each.key].arn
       container_name   = each.key
@@ -339,7 +359,7 @@ resource "aws_lb" "public" {
 }
 
 resource "aws_lb_target_group" "public" {
-  for_each = toset(["web", "pulse-api"])
+  for_each = toset(["web", "pulse-api", "ingest"])
 
   name        = "${local.name}-${each.key}"
   port        = local.service_ports[each.key]

@@ -245,6 +245,20 @@ resource "aws_secretsmanager_secret" "fcm" {
   kms_key_id = aws_kms_key.traycer.arn
 }
 
+# Ingest private keys, as a JSON object of key id to PEM. Holding more than
+# one at a time is required rather than optional: a rotation leaves devices
+# uploading under the previous key until their queues drain, and a server
+# holding only the current key would reject that data.
+#
+# Written by hand, never by Terraform. Putting a private key in a resource
+# argument would place it in the state file, and state is a backup artifact
+# that outlives any key rotation.
+resource "aws_secretsmanager_secret" "ingest_keys" {
+  name        = "${local.name}/ingest/private-keys"
+  kms_key_id  = aws_kms_key.traycer.arn
+  description = "JSON object of key id to RSA private key PEM for upload decryption"
+}
+
 output "relational_endpoint" {
   value     = aws_db_instance.relational.address
   sensitive = true

@@ -55,6 +55,7 @@ three installed works fine locally; they do not conflict.
 | --- | --- |
 | `packages/sdk/` | `@traycer/sdk`, the published sensing library. The most finished thing here. |
 | `apps/web/` | Traycer Pulse dashboard, Next.js 14 App Router |
+| `services/ingest/` | Terminates the SDK upload contract, the write path |
 | `services/voice/` | openSMILE acoustic extraction |
 | `services/scoring/` | Personal baseline and deviation scoring |
 | `services/pulse-api/` | Alert classification, thresholds, clinician push |
@@ -182,15 +183,7 @@ the deviation field is called `deviation_z`.
 
 ## Gaps, in the order I would close them
 
-**1. There is no ingest service.** The SDK uploads an encrypted envelope to a
-documented endpoint. Nothing terminates it. This is the single thing standing
-between the repository and an end to end system, and it is not large: verify
-the device JWT, deduplicate on batch id, unwrap the content key, decrypt,
-validate against the feature vocabulary, write to `behavioral_samples`. The
-client half is fully specified in `packages/sdk/README.md` under "Upload
-behavior" and is covered by tests.
-
-**2. Four dashboard read endpoints do not exist server side.**
+**1. Four dashboard read endpoints do not exist server side.**
 `apps/web/lib/api.ts` calls six endpoints. Two are implemented in the pulse
 API: the alert feed and alert acknowledgement. Four are not:
 
@@ -205,7 +198,7 @@ saying the numbers are synthetic. That is the right behaviour for a portfolio
 deployment and the wrong behaviour to leave in once real data exists. The
 response shapes the frontend expects are in `apps/web/lib/types.ts`.
 
-**3. The alert classifier holds state in process memory.** Confirmation
+**2. The alert classifier holds state in process memory.** Confirmation
 counters and cooldown timestamps live in a dict inside `AlertClassifier`, and
 the container runs two uvicorn workers. Today that is survivable because the
 scoring pipeline routes a given patient's windows through one call and the
@@ -213,20 +206,20 @@ counters rebuild from history on restart. It stops being survivable the moment
 you scale the service horizontally or put a load balancer in front of more than
 one task. Move it to Redis; the connection is already configured and unused.
 
-**4. Terraform has never been applied.** It describes a VPC with three tiers,
+**3. Terraform has never been applied.** It describes a VPC with three tiers,
 two RDS instances, ElastiCache, ECS Fargate services behind one load balancer,
 KMS, and secrets. It is written carefully but it has not been run once. Expect
 to spend a day on `terraform validate` and a first `plan` before trusting it.
 No state file exists yet, and the S3 backend it references does not exist
 either.
 
-**5. SMART on FHIR has only met the sandbox.** The authorization code flow with
+**4. SMART on FHIR has only met the sandbox.** The authorization code flow with
 PKCE, discovery and JWKS verification are complete and correct as far as the
 SMART Health IT sandbox is concerned. Production EHRs vary in ways sandboxes do
 not, particularly around the `aud` parameter, client authentication and launch
 context. Budget real time for the first live integration.
 
-**6. Nothing is clinically validated.** The behavioral features and the
+**5. Nothing is clinically validated.** The behavioral features and the
 directions they move in come from the digital phenotyping literature. The
 thresholds that would turn them into a clinical instrument do not exist. The
 scoring tests establish that the pipeline responds to the right shape of

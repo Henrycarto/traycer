@@ -19,6 +19,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/001_relational_schema.sql:/docker-entrypoint-initdb.d/001_relational_schema.sql:ro
+      - ./sql/003_ingest.sql:/docker-entrypoint-initdb.d/003_ingest.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U traycer -d traycer"]
       interval: 5s
@@ -78,6 +79,37 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+
+  ingest:
+    build:
+      context: ../services/ingest
+      dockerfile: Dockerfile
+    container_name: traycer-ingest
+    environment:
+      TRAYCER_ENV: local
+      POSTGRES_DSN: postgresql://traycer:traycer_local@postgres:5432/traycer
+      TIMESCALE_DSN: postgresql://traycer:traycer_local@timescale:5432/traycer_metrics
+      JWT_SIGNING_KEY: local_dev_signing_key_do_not_ship
+      JWT_AUDIENCE: traycer-ingest
+      JWT_ISSUER: traycer-enrollment
+      # Generate the key first:
+      #   python scripts/generate-ingest-keys.py --key-id traycer-ingest-local
+      INGEST_PRIVATE_KEYS: '{"traycer-ingest-local":"/run/secrets/traycer-ingest-local.pem"}'
+    volumes:
+      - ./secrets:/run/secrets:ro
+    ports:
+      - "8083:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      timescale:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
 
   scoring:
     build:

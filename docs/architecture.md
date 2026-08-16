@@ -6,7 +6,7 @@ A phone collects behavioral features and uploads them encrypted. A scoring
 service compares those features to what that patient normally does. When the
 difference holds across consecutive windows, an alert reaches a clinician.
 
-Four moving parts.
+Five moving parts.
 
 ```
 Patient phone                 Platform                      Clinician
@@ -17,9 +17,9 @@ Patient phone                 Platform                      Clinician
   location fixes     >  15 features/hour
   usage events      /          |
                                v
-                        ingest endpoint
-                               |
-                     decrypt, validate, store
+                     services/ingest (FastAPI)
+                   verify token, dedup on batch id,
+                   decrypt envelope, validate, store
                                |
                     +----------+----------+
                     |                     |
@@ -70,6 +70,22 @@ phone. Running scoring server side also means the model can be retrained and
 redeployed without shipping an app update to every patient, which matters when
 the model is the part most likely to change.
 
+### Ingest is separate from scoring
+
+Ingest is the only service that holds a decrypted behavioral payload, and the
+only one that holds the RSA private keys. Keeping it apart from scoring means
+those keys sit in exactly one task definition, so a compromise of the scoring
+or alerting path cannot read an uploaded batch. It also has a different load
+profile: ingest scales with the number of enrolled devices, scoring scales with
+how often a clinician opens a panel.
+
+Its status codes are part of the SDK contract rather than a matter of taste.
+A 2xx or a 409 tells the device to delete the batch, a 401 or 403 tells it to
+hold and refresh, another 4xx tells it to drop permanently, and a 5xx tells it
+to retry with backoff. Returning the wrong class of code is how a monitoring
+platform loses patient data quietly, so `routers/batches.py` states the mapping
+at the top and the tests assert each one.
+
 ### Alerting is separate from scoring
 
 The scoring service answers a numerical question: how far is this patient from
@@ -91,7 +107,7 @@ config mount, its own resource limits, and its own audit story.
 
 | Store | Holds | Why |
 | --- | --- | --- |
-| PostgreSQL | Patient profiles, clinician panels, thresholds, alert history, access log | Transactional, small, long retention for medical record rules |
+| PostgreSQL | Patient profiles, clinician panels, thresholds, alert history, batch receipts, access log | Transactional, small, long retention for medical record rules |
 | TimescaleDB | Behavioral samples, voice vectors, trajectory scores | Append heavy time series with compression and continuous aggregates |
 | Redis | Alert queue, notification dedup state | Ephemeral and recoverable from Postgres |
 | S3 | Encrypted batch landing area | Objects expire after 30 days; the durable copy is the hypertable |
@@ -131,7 +147,7 @@ Failures use the same shape with `data` null and `error` populated. A client
 that has to branch between two response shapes will eventually get the branch
 wrong, and this is a system where getting it wrong means an alert is not shown.
 
-All three Python services are async throughout. The voice service in
+All four Python services are async throughout. The voice service in
 particular would otherwise block a worker for the several seconds an
 extraction takes.
 
