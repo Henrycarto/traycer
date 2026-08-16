@@ -15,8 +15,13 @@ from app.schemas import ThresholdUpdate
 
 
 @pytest.fixture
-def manager() -> ThresholdManager:
-    return ThresholdManager(InMemoryThresholdStore())
+def store() -> InMemoryThresholdStore:
+    return InMemoryThresholdStore()
+
+
+@pytest.fixture
+def manager(store: InMemoryThresholdStore) -> ThresholdManager:
+    return ThresholdManager(store)
 
 
 class TestDefaults:
@@ -43,11 +48,20 @@ class TestUpdates:
         await manager.update("TRC-2f81a9c4", ThresholdUpdate(cooldown_hours=6))
         assert (await manager.get("TRC-2f81a9c4")).cooldown_hours == 6
 
-    async def test_an_empty_update_is_a_no_op(self, manager) -> None:
+    async def test_an_empty_update_is_a_no_op(self, manager, store) -> None:
         before = await manager.get("TRC-2f81a9c4")
         after = await manager.update("TRC-2f81a9c4", ThresholdUpdate())
 
-        assert after.updated_at == before.updated_at
+        # Nothing was persisted, so the patient still has no stored row and is
+        # still running on defaults.
+        assert await store.get("TRC-2f81a9c4") is None
+
+        # Comparing updated_at directly would compare two independently
+        # generated default timestamps, which differ by microseconds on a
+        # platform with a fine grained clock.
+        assert after.model_dump(exclude={"updated_at"}) == before.model_dump(
+            exclude={"updated_at"}
+        )
 
     async def test_reset_returns_to_the_defaults(self, manager) -> None:
         await manager.update("TRC-2f81a9c4", ThresholdUpdate(elevated_score=40.0))
