@@ -1,0 +1,162 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  sdk:
+    name: SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=@traycer/sdk
+
+      - name: Test
+        run: npm run test --workspace=@traycer/sdk
+
+      - name: Build
+        run: npm run build --workspace=@traycer/sdk
+
+      # The published tarball is the thing third parties install, so its
+      # contents are checked rather than assumed. A stray source map or an
+      # accidental .env in the package is a lot easier to catch here than
+      # after it is on the registry.
+      - name: Inspect the publishable package
+        run: |
+          cd packages/sdk
+          npm pack --dry-run --json > /tmp/pack.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/pack.json') as handle:
+              files = {entry['path'] for entry in json.load(handle)[0]['files']}
+          forbidden = [f for f in files if f.startswith('src/') or f.endswith('.env')]
+          assert not forbidden, f"unexpected files in the package: {forbidden}"
+          assert 'dist/index.js' in files, "the built entry point is missing"
+          assert 'README.md' in files, "the integration guide is missing"
+          print(f"package contains {len(files)} files")
+          PY
+
+  web:
+    name: Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint --workspace=@traycer/web
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=@traycer/web
+
+      - name: Build
+        run: npm run build --workspace=@traycer/web
+
+  services:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [voice, scoring, pulse-api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+
+      - name: Install
+        run: pip install -r services/${{ matrix.service }}/requirements.txt
+
+      - name: Test
+        working-directory: services/${{ matrix.service }}
+        run: python -m pytest -q
+
+      - name: Import the application
+        working-directory: services/${{ matrix.service }}
+        run: python -c "import app.main; print('app imports cleanly')"
+
+  copy-rules:
+    name: Copy rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Enforced rather than reviewed. A check that runs on every push is the
+      # only version of a writing rule that survives contact with a deadline.
+      - name: Writing rules
+        run: python3 scripts/check_copy.py
+
+  docker:
+    name: Container builds
+    runs-on: ubuntu-latest
+    needs: [sdk, web, services]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # The voice image compiles openSMILE from source and takes several
+      # minutes, so it is built here rather than only at deploy time. A broken
+      # extractor build should fail the pull request, not the release.
+      - name: Build the voice image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/voice
+          push: false
+          cache-from: type=gha,scope=voice
+          cache-to: type=gha,mode=max,scope=voice
+
+      - name: Build the scoring image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/scoring
+          push: false
+          cache-from: type=gha,scope=scoring
+          cache-to: type=gha,mode=max,scope=scoring
+
+      - name: Build the pulse-api image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/pulse-api
+          push: false
+          cache-from: type=gha,scope=pulse-api
+          cache-to: type=gha,mode=max,scope=pulse-api
+
+      - name: Build the dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

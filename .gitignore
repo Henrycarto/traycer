@@ -1,0 +1,53 @@
+# Agent tooling
+CLAUDE.md
+.claude/
+*.claude
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Model artifacts. The relapse prediction model and its weights stay private.
+*.onnx
+*.pkl
+*.pt
+*.h5
+models/
+
+# Terraform state holds live infrastructure identifiers
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Voice service scratch space. Audio never persists past a request.
+services/voice/tmp/
+*.wav
+*.flac
+
+# OS
+.DS_Store
+Thumbs.db

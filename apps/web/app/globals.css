@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    background-color: #060910;
+    color: #e5e9f0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Numbers align in a column when they are tabular. A risk score that
+     shifts sideways as it changes from 9 to 10 is harder to scan down a
+     forty patient panel. */
+  .readout {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  ::selection {
+    background-color: rgba(99, 102, 241, 0.3);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #060910;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #1b2436;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #374151;
+  }
+}
+
+@layer components {
+  /* The panel is a plane with a border, not a floating card. No shadow, no
+     radius beyond a hairline. */
+  .panel {
+    @apply border border-line bg-surface;
+  }
+
+  .panel-header {
+    @apply flex items-center justify-between border-b border-line px-4 py-2.5;
+  }
+
+  .panel-title {
+    @apply text-[11px] font-medium uppercase tracking-[0.14em] text-text-secondary;
+  }
+
+  .metric {
+    @apply font-mono readout text-text-primary;
+  }
+
+  .label {
+    @apply text-[11px] uppercase tracking-[0.12em] text-text-muted;
+  }
+
+  /* Square corners on every control. The design brief rules out pill
+     buttons, and a monitoring console should not look like a signup form. */
+  .btn {
+    @apply inline-flex items-center justify-center border px-4 py-2 text-sm font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply btn border-indigo bg-indigo text-white hover:bg-indigo-dim;
+  }
+
+  .btn-quiet {
+    @apply btn border-line bg-transparent text-text-secondary hover:border-text-muted hover:text-text-primary;
+  }
+
+  .field {
+    @apply w-full border border-line bg-void px-3 py-2 font-mono text-sm text-text-primary
+           outline-none placeholder:text-text-muted focus:border-indigo;
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "name": "@traycer/sdk",
+  "version": "0.1.0",
+  "description": "Battery conscious passive behavioral sensing for React Native mental health apps",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Henrycarto/traycer.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/Henrycarto/traycer/tree/main/packages/sdk#readme",
+  "keywords": [
+    "react-native",
+    "digital-phenotyping",
+    "behavioral-sensing",
+    "mental-health",
+    "passive-sensing",
+    "biomarker"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": ">=1.19.0",
+    "@react-native-community/netinfo": ">=11.0.0",
+    "react-native": ">=0.72.0",
+    "react-native-background-fetch": ">=4.2.0",
+    "react-native-device-info": ">=10.0.0",
+    "react-native-geolocation-service": ">=5.3.0",
+    "react-native-sensors": ">=7.3.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": { "optional": true },
+    "@react-native-community/netinfo": { "optional": true },
+    "react-native-background-fetch": { "optional": true },
+    "react-native-device-info": { "optional": true },
+    "react-native-geolocation-service": { "optional": true },
+    "react-native-sensors": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

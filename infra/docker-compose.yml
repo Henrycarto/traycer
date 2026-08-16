@@ -1,0 +1,169 @@
+name: traycer
+
+# Local development stack. Two Postgres instances on purpose: the relational
+# store holds patient profiles and clinician panel config, the Timescale
+# instance holds the continuous behavioral metric stream. They have different
+# backup cadences and different retention rules in production, so they are
+# separated here to keep the connection strings honest.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: traycer-postgres
+    environment:
+      POSTGRES_USER: traycer
+      POSTGRES_PASSWORD: traycer_local
+      POSTGRES_DB: traycer
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/001_relational_schema.sql:/docker-entrypoint-initdb.d/001_relational_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traycer -d traycer"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  timescale:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: traycer-timescale
+    environment:
+      POSTGRES_USER: traycer
+      POSTGRES_PASSWORD: traycer_local
+      POSTGRES_DB: traycer_metrics
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./sql/002_timeseries_schema.sql:/docker-entrypoint-initdb.d/002_timeseries_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traycer -d traycer_metrics"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: traycer-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  voice:
+    build:
+      context: ../services/voice
+      dockerfile: Dockerfile
+    container_name: traycer-voice
+    environment:
+      TRAYCER_ENV: local
+      OPENSMILE_BINARY: /usr/local/bin/SMILExtract
+      OPENSMILE_CONFIG_DIR: /opt/opensmile/config
+      OPENSMILE_CONFIG: /opt/opensmile/config/egemaps/v02/eGeMAPSv02.conf
+      VOICE_MAX_SAMPLE_SECONDS: "30"
+      SCORING_SERVICE_URL: http://scoring:8000
+      JWT_SIGNING_KEY: local_dev_signing_key_do_not_ship
+    ports:
+      - "8081:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  scoring:
+    build:
+      context: ../services/scoring
+      dockerfile: Dockerfile
+    container_name: traycer-scoring
+    environment:
+      TRAYCER_ENV: local
+      TIMESCALE_DSN: postgresql://traycer:traycer_local@timescale:5432/traycer_metrics
+      POSTGRES_DSN: postgresql://traycer:traycer_local@postgres:5432/traycer
+      REDIS_URL: redis://redis:6379/0
+      PULSE_API_URL: http://pulse-api:8000
+      JWT_SIGNING_KEY: local_dev_signing_key_do_not_ship
+      BASELINE_WINDOW_DAYS: "14"
+    ports:
+      - "8082:8000"
+    depends_on:
+      timescale:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  pulse-api:
+    build:
+      context: ../services/pulse-api
+      dockerfile: Dockerfile
+    container_name: traycer-pulse-api
+    environment:
+      TRAYCER_ENV: local
+      POSTGRES_DSN: postgresql://traycer:traycer_local@postgres:5432/traycer
+      REDIS_URL: redis://redis:6379/1
+      SCORING_SERVICE_URL: http://scoring:8000
+      FCM_PROJECT_ID: traycer-local
+      FCM_CREDENTIALS_PATH: /run/secrets/fcm.json
+      FCM_DRY_RUN: "true"
+      JWT_SIGNING_KEY: local_dev_signing_key_do_not_ship
+      FHIR_ISSUER: https://launch.smarthealthit.org/v/r4/fhir
+      FHIR_CLIENT_ID: traycer-pulse-local
+      FHIR_REDIRECT_URI: http://localhost:3000/api/fhir/callback
+    ports:
+      - "8080:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  web:
+    build:
+      context: ../
+      dockerfile: apps/web/Dockerfile
+    container_name: traycer-web
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_PULSE_API_URL: http://localhost:8080
+      PULSE_API_INTERNAL_URL: http://pulse-api:8000
+      SCORING_API_INTERNAL_URL: http://scoring:8000
+      VOICE_API_INTERNAL_URL: http://voice:8000
+      FHIR_ISSUER: https://launch.smarthealthit.org/v/r4/fhir
+      FHIR_CLIENT_ID: traycer-pulse-local
+      FHIR_REDIRECT_URI: http://localhost:3000/api/fhir/callback
+      FHIR_SCOPES: "launch openid fhirUser profile patient/Patient.read patient/Observation.read offline_access"
+      SESSION_SECRET: local_dev_session_secret_do_not_ship
+    ports:
+      - "3000:3000"
+    depends_on:
+      pulse-api:
+        condition: service_started
+      scoring:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  timescale_data:
+  redis_data:

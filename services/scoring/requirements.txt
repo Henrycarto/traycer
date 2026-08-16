@@ -1,0 +1,22 @@
+fastapi==0.115.4
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+PyJWT==2.9.0
+httpx==0.27.2
+
+numpy==2.1.2
+scipy==1.14.1
+pandas==2.2.3
+scikit-learn==1.5.2
+
+asyncpg==0.30.0
+redis==5.1.1
+
+# The trained relapse model lives in a private index and is installed only in
+# the deployed image. Absent here on purpose. See engine/lstm_predictor.py.
+# traycer-relapse-model==0.4.0
+# traycer-coefficients==0.3.1
+
+# Test only
+pytest==8.3.3
+pytest-asyncio==0.24.0

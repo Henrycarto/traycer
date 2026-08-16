@@ -1,0 +1,14 @@
+# Normalise to LF in the repository. The services run in Linux containers and
+# the shell scripts inside the Dockerfiles break on CRLF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.wav binary
+*.onnx binary
+*.pkl binary
+
+# Generated. Collapse it in diffs and exclude it from language statistics so
+# the repository does not report itself as mostly JSON.
+package-lock.json linguist-generated=true -diff
