@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { TrajectoryChart, trajectoryState } from '@/components/pulse/TrajectoryChart';
+import { TrajectoryChart } from '@/components/pulse/TrajectoryChart';
+import { trajectoryState } from '@/lib/trajectory';
 import { AlertFeed } from '@/components/pulse/AlertFeed';
 import { fetchAlerts, fetchTrajectory } from '@/lib/api';
 

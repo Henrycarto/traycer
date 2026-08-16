@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { RiskScoreBadge } from '@/components/pulse/RiskScoreBadge';
-import { TrajectoryChart, trajectoryState } from '@/components/pulse/TrajectoryChart';
+import { TrajectoryChart } from '@/components/pulse/TrajectoryChart';
+import { trajectoryState } from '@/lib/trajectory';
 import { AlertFeed } from '@/components/pulse/AlertFeed';
 import { SDKStatusBadge } from '@/components/sdk/SDKStatusBadge';
 import { SensorFeedPanel } from '@/components/sdk/SensorFeedPanel';

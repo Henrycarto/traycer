@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
+import { trajectoryState, type TrajectoryState } from '@/lib/trajectory';
 import type { TrajectorySeries } from '@/lib/types';
 
 /**
@@ -45,8 +46,6 @@ const COLORS = {
   surface: '#0C1220',
 } as const;
 
-export type TrajectoryState = 'quiet' | 'warning' | 'alert';
-
 export interface TrajectoryChartProps {
   series: TrajectorySeries;
   /** Chart height in pixels. The panel view uses a shorter chart. */
@@ -61,22 +60,6 @@ interface ChartRow {
   label: string;
   score: number;
   sparse: boolean;
-}
-
-/**
- * Which band the trajectory currently sits in.
- *
- * Reads the most recent point rather than the maximum across the window. A
- * patient who crossed the threshold three weeks ago and has been stable since
- * is not in an alert state now, and showing a red border for history would
- * train clinicians to ignore the colour.
- */
-export function trajectoryState(series: TrajectorySeries): TrajectoryState {
-  const latest = series.points.at(-1);
-  if (!latest) return 'quiet';
-  if (latest.score >= series.alertThreshold) return 'alert';
-  if (latest.score >= series.warningThreshold) return 'warning';
-  return 'quiet';
 }
 
 const BORDER_BY_STATE: Record<TrajectoryState, string> = {
