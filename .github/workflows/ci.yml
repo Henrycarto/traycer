@@ -78,6 +78,14 @@ jobs:
       - name: Build
         run: npm run build --workspace=@traycer/web
 
+      # A green build does not mean the app runs. Both patient routes once
+      # crashed at request time on a client boundary mistake while the build,
+      # the type checker and every other job stayed green, because dynamic
+      # routes are never rendered during a build. This boots the standalone
+      # server and requests every route.
+      - name: Smoke test the routes
+        run: npm run web:smoke
+
   services:
     name: ${{ matrix.service }}
     runs-on: ubuntu-latest

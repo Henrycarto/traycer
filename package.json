@@ -26,6 +26,7 @@
     "sdk:build": "npm run build --workspace=@traycer/sdk",
     "sdk:test": "npm run test --workspace=@traycer/sdk",
     "web:dev": "npm run dev --workspace=@traycer/web",
+    "web:smoke": "node scripts/smoke-routes.mjs",
     "services:up": "docker compose -f infra/docker-compose.yml up --build",
     "services:down": "docker compose -f infra/docker-compose.yml down -v"
   },

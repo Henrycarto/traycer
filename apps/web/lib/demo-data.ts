@@ -87,6 +87,7 @@ export function demoTrajectorySeries(
   patientCode: string,
   shape: TrajectoryShape = 'crossing',
   seed = 41,
+  baselineQuality: TrajectorySeries['baselineQuality'] = 'established',
 ): TrajectorySeries {
   const scores = generateTrajectory(shape, seed);
 
@@ -102,7 +103,7 @@ export function demoTrajectorySeries(
     baseline: 31,
     warningThreshold: WARNING_THRESHOLD,
     alertThreshold: ALERT_THRESHOLD,
-    baselineQuality: 'established',
+    baselineQuality,
   };
 }
 
@@ -194,10 +195,15 @@ export function demoAlerts(): AlertRecord[] {
 
 export function demoTrajectory(patientCode: string): TrajectorySeries {
   const spec = PANEL.find((entry) => entry.code === patientCode);
+  // Baseline quality has to match what the panel reports for the same
+  // patient. When these disagree the detail page shows a score for a patient
+  // the panel says has no baseline, which is exactly the contradiction the
+  // interface exists to avoid.
   return demoTrajectorySeries(
     patientCode,
     spec?.shape ?? 'crossing',
     spec?.seed ?? 41,
+    spec?.baselineQuality ?? 'established',
   );
 }
 

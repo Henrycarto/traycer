@@ -44,6 +44,12 @@ export default async function PatientPage({ params }: PageProps) {
   const severity: Severity =
     patient?.severity ?? (state === 'alert' ? 'critical' : state === 'warning' ? 'elevated' : 'stable');
 
+  // A patient without an established baseline has no score, and the badge
+  // shows a placeholder rather than a number. Deriving this from the series
+  // rather than from the panel row keeps the detail page and the panel from
+  // disagreeing about the same patient.
+  const badgeScore = series.baselineQuality === 'insufficient' ? null : (latest?.score ?? null);
+
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 py-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-6 border-b border-line pb-5">
@@ -63,7 +69,7 @@ export default async function PatientPage({ params }: PageProps) {
             </div>
           </div>
 
-          <RiskScoreBadge score={latest?.score ?? null} severity={severity} size="large" />
+          <RiskScoreBadge score={badgeScore} severity={severity} size="large" />
         </div>
 
         <div className="flex flex-col items-end gap-3">
