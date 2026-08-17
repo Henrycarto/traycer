@@ -178,35 +178,12 @@ changes which treatments are still on the table.
 
 ## 5. The SDK as distribution
 
-The commercial structure follows from the technical split.
-
-Selling a behavioral monitoring platform to a clinic means selling a new
-patient-facing app, which means an install, an onboarding flow, a support
-burden and a consent conversation for every patient. That is a slow sale with a
-long implementation and a high failure rate at the point of patient adoption.
-
-Selling the sensing layer as a free npm package to a digital therapeutics
-company means their existing app, already installed on their patients' phones,
-already consented to, becomes the collection point. Their engineer adds a
-dependency and about forty lines of adapter wiring. The patient installs
-nothing.
-
-That changes what is being sold. The SDK is not the product; it is the
-distribution channel, and it is worth more open than closed because the
-adoption barrier for a permissively licensed library that a company can read
-line by line before it touches a patient's phone is far lower than for a binary
-under a commercial agreement. The privacy design is the same argument made
-technically: a reviewer can read the closed feature vocabulary and the data
-minimizer in twenty minutes and confirm exactly what leaves the device, which
-is a much shorter security review than any vendor questionnaire.
-
-What is retained is the scoring service. A partner who embeds the SDK gets
-behavioral features they can use for their own purposes. To turn those features
-into a relapse trajectory, they need the baseline builder, the calibrated
-coefficients and the trained model, and those are hosted. The SDK creates the
-data, the scoring service prices it, and each additional partner increases both
-the surface area of collection and the corpus available to improve the model
-that only we can run.
+The sensing layer ships as a permissively licensed npm package that a third
+party mental health application embeds, so the patient installs nothing new and
+consents once, inside a product they already use. The scoring service is what is
+retained: features without the baseline builder, the calibrated coefficients and
+the trained model are just numbers. The commercial detail of that arrangement is
+not published here.
 
 ## 6. Public and private split
 
