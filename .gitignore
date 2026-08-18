@@ -59,3 +59,4 @@ services/voice/tmp/
 # OS
 .DS_Store
 Thumbs.db
+.vercel
