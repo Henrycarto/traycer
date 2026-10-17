@@ -72,7 +72,7 @@ BANNED_PHRASES = (
     r"unlock(?:s|ing)?\s+\w+\s+(?:potential|value|insight)",
 )
 
-EM_DASH = "2014"
+EM_DASH = "—"
 
 BANNED_PATTERN = re.compile(
     r"\b(" + "|".join(re.escape(word) for word in BANNED_WORDS) + r")\b",
